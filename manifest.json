@@ -1,0 +1,18 @@
+{
+  "name": "Mak Stream",
+  "short_name": "Mak Stream",
+  "description": "የእግር ኳስ ስትሪም ማዕከል",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#1f6feb",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
