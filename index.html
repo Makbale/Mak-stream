@@ -10,8 +10,6 @@
 <link rel="apple-touch-icon" href="icon.svg">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Mak Stream">
-<!-- HLS.js ላይብረሪ -->
-<script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -19,7 +17,7 @@
     background: #0d1117; color: #e6edf3;
     font-family: system-ui, -apple-system, sans-serif;
     display: flex; flex-direction: column; overflow: hidden;
-    padding-bottom: 70px; /* ለታችኛው አሞሌ ቦታ */
+    padding-bottom: 70px;
   }
 
   header {
@@ -31,143 +29,188 @@
   header h1 { font-size: 20px; font-weight: 700; flex: 1; }
   header .ball { font-size: 22px; }
 
-  main {
-    flex: 1; overflow-y: auto; padding: 16px;
-    -webkit-overflow-scrolling: touch;
-  }
+  main { flex: 1; overflow-y: auto; padding: 16px; -webkit-overflow-scrolling: touch; }
 
-  /* ---- የታችኛው ቋሚ አሞሌ ---- */
   .bottom-bar {
     position: fixed; bottom: 0; left: 0; right: 0;
-    height: 70px;
-    background: #161b22;
+    height: 70px; background: #161b22;
     border-top: 1px solid #30363d;
-    display: flex;
-    padding-bottom: env(safe-area-inset-bottom);
+    display: flex; padding-bottom: env(safe-area-inset-bottom);
     z-index: 100;
   }
   .bottom-bar button {
     flex: 1; background: transparent; border: none;
-    color: #7d8590; font-size: 14px; font-weight: 600;
+    color: #7d8590; font-size: 13px; font-weight: 600;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center; gap: 4px;
     cursor: pointer; transition: color .15s, background .15s;
   }
   .bottom-bar button .icon { font-size: 20px; }
-  .bottom-bar button.active {
-    color: #58a6ff; background: rgba(88,166,255,.1);
-  }
+  .bottom-bar button.active { color: #58a6ff; background: rgba(88,166,255,.1); }
 
-  /* ---- ገጽታዎች ---- */
   .view { display: none; }
   .view.active { display: block; }
 
-  /* ---- የጨዋታ ካርዶች ---- */
   .date-group { margin-bottom: 20px; }
   .date-group-header {
     font-size: 13px; color: #7d8590; font-weight: 700;
     margin-bottom: 10px; padding-bottom: 6px;
     border-bottom: 1px solid #21262d;
   }
+
+  /* ---- የጨዋታ ካርድ ---- */
   .match {
+    position: relative;
     background: #161b22; border: 1px solid #30363d;
-    border-radius: 12px; padding: 12px 14px; margin-bottom: 8px;
+    border-radius: 12px; padding: 12px 14px 12px 12px; margin-bottom: 8px;
     display: flex; flex-direction: column; gap: 6px;
     cursor: pointer;
   }
   .match:active { background: #21262d; }
+  .match.fav {
+    border-left: 3px solid #f7c948;
+    background: linear-gradient(90deg, rgba(247,201,72,.05), #161b22 40%);
+  }
   .match-top {
     display: flex; justify-content: space-between; align-items: center;
     font-size: 11px; color: #7d8590; gap: 8px;
+    padding-right: 32px;
   }
   .match-league { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .match-time {
     background: #21262d; padding: 2px 8px; border-radius: 6px;
     color: #58a6ff; font-weight: 600; flex-shrink: 0;
   }
+  .match.live { border-color: #da3633; }
+  .match.live.fav { border-left: 3px solid #f7c948; border-right-color: #da3633; }
+  .match.live .match-time { background: #da3633; color: #fff; }
+  .match.live .match-time::before { content: "🔴 "; }
+  .match.finished .match-time { background: #21262d; color: #7d8590; }
+  .match.finished .match-time::before { content: "✓ "; }
   .match-body {
     display: flex; align-items: center; justify-content: space-between;
     font-size: 14px; font-weight: 600; gap: 8px;
   }
-  .match-body .team { flex: 1; }
-  .match-body .team.away { text-align: right; }
+  .match-body .team { flex: 1; display: flex; align-items: center; gap: 4px; }
+  .match-body .team.away { justify-content: flex-end; }
+  .match-body .team .team-star { font-size: 11px; color: #f7c948; }
   .match-body .score {
     background: #21262d; padding: 2px 8px; border-radius: 6px;
     color: #f7c948; font-size: 13px; flex-shrink: 0;
   }
   .match-body .vs { color: #7d8590; font-size: 12px; font-weight: 400; }
-  .match.live { border-color: #da3633; }
-  .match.live .match-time { background: #da3633; color: #fff; }
-  .match.live .match-time::before { content: "🔴 "; }
 
-  /* ---- የማጫወቻ መስኮት (Modal) ---- */
+  /* የተወዳጅ አዝራር */
+  .fav-btn {
+    position: absolute; top: 8px; right: 8px;
+    width: 28px; height: 28px; border-radius: 50%;
+    background: transparent; border: none;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; color: #7d8590; cursor: pointer;
+  }
+  .fav-btn:active { background: #30363d; }
+  .fav-btn.on { color: #f7c948; }
+
+  /* ---- ማጫወቻ ---- */
   .player-modal {
     position: fixed; inset: 0; z-index: 200;
-    background: #000; display: none;
-    flex-direction: column;
+    background: #000; display: none; flex-direction: column;
   }
   .player-modal.open { display: flex; }
   .player-header {
     position: absolute; top: 0; left: 0; right: 0;
     padding: 10px 14px;
     padding-top: calc(10px + env(safe-area-inset-top));
-    display: flex; align-items: center; justify-content: space-between;
-    z-index: 2;
-    background: linear-gradient(to bottom, rgba(0,0,0,.8), transparent);
+    display: flex; align-items: center; gap: 8px;
+    z-index: 4;
+    background: linear-gradient(to bottom, rgba(0,0,0,.85), transparent);
   }
   .player-header .title {
     font-size: 13px; color: #fff; font-weight: 600;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    flex: 1; margin-right: 10px;
+    flex: 1; margin-right: 6px;
   }
-  .player-header .close-btn {
+  .player-header .icon-btn {
     background: rgba(255,255,255,.15); border: none; color: #fff;
     width: 36px; height: 36px; border-radius: 50%;
-    font-size: 20px; cursor: pointer;
+    font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
   }
+  .player-header .icon-btn:active { background: rgba(255,255,255,.3); }
 
   /* ---- የሰርቨር መምረጫ ---- */
   .server-btn {
     position: absolute; top: calc(60px + env(safe-area-inset-top)); left: 14px;
     z-index: 5;
-    background: rgba(22,27,34,.9); border: 1px solid #30363d;
+    background: rgba(22,27,34,.92); border: 1px solid #30363d;
     color: #e6edf3; border-radius: 8px;
     padding: 8px 12px; font-size: 13px; font-weight: 600;
     cursor: pointer;
     display: flex; align-items: center; gap: 6px;
   }
-  .server-btn .caret { font-size: 10px; }
+  .server-btn .caret { font-size: 10px; transition: transform .2s; }
+  .server-btn.open .caret { transform: rotate(180deg); }
   .server-menu {
     position: absolute; top: calc(100px + env(safe-area-inset-top)); left: 14px;
     z-index: 6;
     background: #161b22; border: 1px solid #30363d;
     border-radius: 10px; overflow: hidden;
-    min-width: 180px;
+    min-width: 200px;
     display: none;
   }
   .server-menu.open { display: block; }
   .server-menu button {
-    display: block; width: 100%;
-    background: transparent; border: none; color: #e6edf3;
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; background: transparent; border: none; color: #e6edf3;
     padding: 12px 16px; text-align: left; font-size: 14px;
     cursor: pointer; border-bottom: 1px solid #21262d;
   }
   .server-menu button:last-child { border-bottom: none; }
   .server-menu button:active { background: #21262d; }
   .server-menu button.active { color: #58a6ff; font-weight: 700; }
+  .server-menu button .check { margin-left: auto; color: #58a6ff; }
 
   #video-container {
     flex: 1; display: flex; align-items: center; justify-content: center;
-    background: #000;
+    background: #000; position: relative; overflow: hidden;
   }
-  #video-container video {
-    width: 100%; height: 100%; object-fit: contain;
+  #video-container iframe {
+    width: 100%; height: 100%; border: none; background: #000;
   }
+
+  .loading-spinner {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 16px;
+    background: #000; z-index: 2;
+    color: #7d8590; font-size: 13px;
+  }
+  .spinner {
+    width: 44px; height: 44px;
+    border: 3px solid #21262d;
+    border-top-color: #58a6ff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
   .player-fallback {
-    text-align: center; color: #7d8590; font-size: 14px;
-    padding: 30px; line-height: 1.6;
+    text-align: center; color: #c9d1d9; font-size: 14px;
+    padding: 30px; line-height: 1.8; max-width: 400px;
   }
-  .player-fallback a { color: #58a6ff; }
+  .player-fallback .big-icon { font-size: 48px; margin-bottom: 16px; }
+  .player-fallback .msg { color: #7d8590; font-size: 13px; margin-bottom: 20px; }
+  .player-fallback .action-btn {
+    display: inline-block;
+    background: #1f6feb; color: #fff; text-decoration: none;
+    padding: 12px 24px; border-radius: 10px;
+    font-weight: 600; font-size: 14px;
+    margin: 4px;
+  }
+  .player-fallback .action-btn.secondary {
+    background: #21262d; border: 1px solid #30363d;
+  }
 
   .empty, .loading {
     text-align: center; padding: 30px 20px;
@@ -183,18 +226,14 @@
 </header>
 
 <main>
-  <!-- የውጤት ገጽታ -->
   <div id="resultsView" class="view active">
     <div id="resultsList"></div>
   </div>
-
-  <!-- የቀጥታ ገጽታ -->
   <div id="liveView" class="view">
     <div id="liveList"></div>
   </div>
 </main>
 
-<!-- የታችኛው አሞሌ -->
 <div class="bottom-bar">
   <button id="tabResults" class="active">
     <span class="icon">📊</span>
@@ -206,11 +245,11 @@
   </button>
 </div>
 
-<!-- የማጫወቻ መስኮት -->
 <div class="player-modal" id="playerModal">
   <div class="player-header">
     <span class="title" id="playerTitle">ጨዋታ</span>
-    <button class="close-btn" id="closePlayer">✕</button>
+    <button class="icon-btn" id="fullscreenBtn" title="ሙሉ ስክሪን">⛶</button>
+    <button class="icon-btn" id="closePlayer">✕</button>
   </div>
 
   <button class="server-btn" id="serverBtn">
@@ -218,9 +257,7 @@
   </button>
   <div class="server-menu" id="serverMenu"></div>
 
-  <div id="video-container">
-    <video id="video" controls playsinline></video>
-  </div>
+  <div id="video-container"></div>
 </div>
 
 <script>
@@ -232,6 +269,8 @@ const SITES = [
   { id: "yalla",    name: "Yalla Shoot",  url: "https://www.yalla-shoot.tv" },
   { id: "vip",      name: "VIPLeague",    url: "https://vipleague.pm" },
   { id: "total",    name: "Totalsportek", url: "https://totalsportek.com" },
+  { id: "footybite",name: "FootyBite",    url: "https://footybite.to" },
+  { id: "sportsurge",name: "Sportsurge",  url: "https://sportsurge.net" },
 ];
 /* ============================================ */
 
@@ -243,15 +282,29 @@ const tabResults = document.getElementById('tabResults');
 const tabLive = document.getElementById('tabLive');
 const playerModal = document.getElementById('playerModal');
 const closePlayer = document.getElementById('closePlayer');
+const fullscreenBtn = document.getElementById('fullscreenBtn');
 const serverBtn = document.getElementById('serverBtn');
 const serverMenu = document.getElementById('serverMenu');
 const playerTitle = document.getElementById('playerTitle');
-const video = document.getElementById('video');
+const videoContainer = document.getElementById('video-container');
 
-let allEvents = [];
-let currentHls = null; // የHLS ማጫወቻ ሁኔታ
-let currentMatch = null;
-let currentServer = null;
+/* ---------- ተወዳጅ ቡድኖች ---------- */
+function getFavTeams() {
+  try { return JSON.parse(localStorage.getItem('makFavTeams') || '[]'); }
+  catch { return []; }
+}
+function saveFavTeams(list) { localStorage.setItem('makFavTeams', JSON.stringify(list)); }
+function isFavTeam(team) { return team && getFavTeams().includes(team); }
+function toggleFavTeam(team) {
+  if (!team) return;
+  const teams = getFavTeams();
+  const i = teams.indexOf(team);
+  if (i >= 0) teams.splice(i, 1); else teams.push(team);
+  saveFavTeams(teams);
+}
+function matchHasFavTeam(ev) {
+  return isFavTeam(ev.strHomeTeam) || isFavTeam(ev.strAwayTeam);
+}
 
 /* ---------- የቀን መግለጫ ---------- */
 const AM_MONTHS = ['ጃንዩወሪ','ፌብሩወሪ','ማርች','ኤፕሪል','ሜይ','ጁን','ጁላይ','ኦገስት','ሴፕቴምበር','ኦክቶበር','ኖቬምበር','ዲሴምበር'];
@@ -264,9 +317,7 @@ function formatDateAm(ymd) {
   if (diff === 0) return 'ዛሬ';
   if (diff === -1) return 'ትናንት';
   if (diff === 1) return 'ነገ';
-  const day = AM_DAYS[d.getDay()];
-  const month = AM_MONTHS[d.getMonth()];
-  return `${day}፣ ${d.getDate()} ${month}`;
+  return `${AM_DAYS[d.getDay()]}፣ ${d.getDate()} ${AM_MONTHS[d.getMonth()]}`;
 }
 
 /* ---------- የጨዋታ ካርድ ---------- */
@@ -281,25 +332,55 @@ function makeMatchCard(ev) {
   const time = (ev.strTime || '').slice(0, 5) || '—';
   const live = isLiveEvent(ev);
   const finished = isFinishedEvent(ev);
+  const fav = matchHasFavTeam(ev);
+  const homeFav = isFavTeam(ev.strHomeTeam);
+  const awayFav = isFavTeam(ev.strAwayTeam);
   const showScore = (live || finished) && ev.intHomeScore != null && ev.intAwayScore != null;
 
+  let cls = 'match';
+  if (live) cls += ' live';
+  else if (finished) cls += ' finished';
+  if (fav) cls += ' fav';
+
   const card = document.createElement('div');
-  card.className = 'match' + (live ? ' live' : '');
+  card.className = cls;
   card.innerHTML = `
+    <button class="fav-btn ${fav ? 'on' : ''}">${fav ? '⭐' : '☆'}</button>
     <div class="match-top">
       <span class="match-league">${ev.strLeague || '—'}</span>
       <span class="match-time">${live ? 'LIVE' : finished ? 'FT' : time}</span>
     </div>
     <div class="match-body">
-      <span class="team">${ev.strHomeTeam || '?'}</span>
+      <span class="team">${homeFav ? '<span class="team-star">⭐</span>' : ''}${ev.strHomeTeam || '?'}</span>
       ${showScore
         ? `<span class="score">${ev.intHomeScore} - ${ev.intAwayScore}</span>`
         : `<span class="vs">vs</span>`}
-      <span class="team away">${ev.strAwayTeam || '?'}</span>
+      <span class="team away">${ev.strAwayTeam || '?'}${awayFav ? '<span class="team-star">⭐</span>' : ''}</span>
     </div>
   `;
 
-  // ለቀጥታ ጨዋታዎች ብቻ ማጫወቻ ይከፈታል
+  // የተወዳጅ አዝራር — ሁለቱንም ቡድኖች ወደ ተወዳጅ ጨምር/አስወግድ
+  card.querySelector('.fav-btn').addEventListener('click', e => {
+    e.stopPropagation();
+    const teams = getFavTeams();
+    const home = ev.strHomeTeam, away = ev.strAwayTeam;
+    const bothFav = home && away && teams.includes(home) && teams.includes(away);
+    if (bothFav) {
+      [home, away].forEach(t => {
+        const i = teams.indexOf(t);
+        if (i >= 0) teams.splice(i, 1);
+      });
+    } else {
+      [home, away].filter(Boolean).forEach(t => {
+        if (!teams.includes(t)) teams.push(t);
+      });
+    }
+    saveFavTeams(teams);
+    // ካርዱን በራሱ ቦታ ቀይር
+    const newCard = makeMatchCard(ev);
+    card.replaceWith(newCard);
+  });
+
   if (live) {
     card.addEventListener('click', () => openPlayer(ev));
   } else {
@@ -308,14 +389,13 @@ function makeMatchCard(ev) {
   return card;
 }
 
-/* ---------- የውጤት ገጽታ (በቀን የተከፋፈለ) ---------- */
+/* ---------- የውጤት ገጽታ ---------- */
 async function loadResults() {
   resultsList.className = 'loading';
   resultsList.textContent = 'በመጫን ላይ...';
 
   const today = new Date();
   const days = [];
-  // ያለፉት 7 ቀናት
   for (let i = 7; i >= 1; i--) {
     const d = new Date(today); d.setDate(d.getDate() - i);
     days.push(d.toISOString().split('T')[0]);
@@ -326,6 +406,7 @@ async function loadResults() {
       fetch(`https://www.thesportsdb.com/api/v1/json/3/eventsday.php?d=${ymd}&s=Soccer`)
         .then(r => r.json())
         .then(data => ({ ymd, events: (data.events || []).filter(e => isFinishedEvent(e)) }))
+        .catch(() => ({ ymd, events: [] }))
     );
 
     const results = await Promise.all(promises);
@@ -348,7 +429,7 @@ async function loadResults() {
 
     if (total === 0) {
       resultsList.className = 'empty';
-      resultsList.textContent = 'በያውቁት ቀናት ውስጥ የተጠናቀቁ ጨዋታዎች አልተገኙም።';
+      resultsList.textContent = 'በያለፉት 7 ቀናት የተጠናቀቁ ጨዋታዎች አልተገኙም።';
     }
   } catch (err) {
     resultsList.className = 'empty';
@@ -362,10 +443,8 @@ async function loadLive() {
   liveList.textContent = 'በመጫን ላይ...';
 
   const today = new Date().toISOString().split('T')[0];
-  const url = `https://www.thesportsdb.com/api/v1/json/3/eventsday.php?d=${today}&s=Soccer`;
-
   try {
-    const res = await fetch(url);
+    const res = await fetch(`https://www.thesportsdb.com/api/v1/json/3/eventsday.php?d=${today}&s=Soccer`);
     const data = await res.json();
     const events = (data.events || []).filter(e => isLiveEvent(e));
 
@@ -377,7 +456,6 @@ async function loadLive() {
       liveList.textContent = 'አሁን በቀጥታ የሚተላለፍ ጨዋታ የለም።';
       return;
     }
-
     events.sort((a,b) => (a.strTimestamp||'').localeCompare(b.strTimestamp||''));
     events.forEach(ev => liveList.appendChild(makeMatchCard(ev)));
   } catch (err) {
@@ -387,60 +465,72 @@ async function loadLive() {
 }
 
 /* ---------- የማጫወቻ ስራዎች ---------- */
+let currentMatch = null;
+let currentServer = null;
+let loadTimer = null;
+
+function getLastServer() {
+  try {
+    const id = localStorage.getItem('makServer');
+    return SITES.find(s => s.id === id) || SITES[0];
+  } catch { return SITES[0]; }
+}
+
 function openPlayer(ev) {
   currentMatch = ev;
-  playerTitle.textContent = `${ev.strHomeTeam} vs ${ev.strAwayTeam}`;
-  serverMenu.innerHTML = '';
+  playerTitle.textContent = `${ev.strHomeTeam || ''} vs ${ev.strAwayTeam || ''}`;
   serverMenu.classList.remove('open');
-
-  // ነባሪ ሰርቨር
-  currentServer = SITES[0];
+  serverBtn.classList.remove('open');
+  currentServer = getLastServer();
   loadStream(currentServer);
   playerModal.classList.add('open');
 }
 
 function loadStream(site) {
-  // የHLS ማጫወቻ አጥፋ
-  if (currentHls) { currentHls.destroy(); currentHls = null; }
-  video.innerHTML = '';
+  currentServer = site;
+  localStorage.setItem('makServer', site.id);
 
-  // ማሳሰቢያ፡ እውነተኛው የm3u8 ማገናኛ ከስትሪሚንግ ጣቢያው መወጣት አለበት።
-  // ለአሁኑ ጊዜ የiframe አማራጭን እንጠቀም (አንዳንድ ጣቢያዎች iframe ይፈቅዳሉ)።
+  // አሮጌውን አጥፋ
+  videoContainer.innerHTML = '';
+  clearTimeout(loadTimer);
+
+  // የመጫኛ ስፒነር
+  const spinner = document.createElement('div');
+  spinner.className = 'loading-spinner';
+  spinner.innerHTML = `<div class="spinner"></div><div>${site.name} በመክፈት ላይ...</div>`;
+  videoContainer.appendChild(spinner);
+
   const iframe = document.createElement('iframe');
   iframe.src = site.url;
-  iframe.style.width = '100%';
-  iframe.style.height = '100%';
-  iframe.style.border = 'none';
   iframe.allowFullscreen = true;
   iframe.referrerPolicy = 'no-referrer';
+  iframe.setAttribute('allow', 'autoplay; fullscreen; encrypted-media; picture-in-picture');
+  iframe.style.display = 'none';
 
-  // የiframe ስህተት አስተዳደር
   iframe.onload = () => {
-    // ገጹ ከተጫነ በኋላ ምንም ማድረግ አያስፈልግም
+    clearTimeout(loadTimer);
+    spinner.remove();
+    iframe.style.display = 'block';
   };
-  iframe.onerror = () => {
+
+  videoContainer.appendChild(iframe);
+
+  // 8 ሰከንድ ካልተከፈተ → fallback
+  loadTimer = setTimeout(() => {
+    spinner.remove();
+    iframe.remove();
     showFallback(site);
-  };
-
-  video.parentElement.innerHTML = ''; // አሮጌውን አጥፋ
-  video.parentElement.appendChild(iframe);
-
-  // የHLS ማጫወቻ ሙከራ (አስተያየት)
-  // if (Hls.isSupported()) {
-  //   currentHls = new Hls();
-  //   currentHls.loadSource(m3u8Url);
-  //   currentHls.attachMedia(video);
-  // } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-  //   video.src = m3u8Url;
-  // }
+  }, 8000);
 }
 
 function showFallback(site) {
-  const container = video.parentElement;
-  container.innerHTML = `
+  videoContainer.innerHTML = `
     <div class="player-fallback">
-      ይህ ጣቢያ በአፕሊኬሽኑ ውስጥ መከፈት አልቻለም።<br>
-      <a href="${site.url}" target="_blank">እዚህ ተጫን</a> በአዲስ ታብ ለመክፈት።
+      <div class="big-icon">📡</div>
+      <div style="font-weight:600; margin-bottom:8px;">${site.name} በአፕሊኬሽኑ ውስጥ አልተከፈተም</div>
+      <div class="msg">ይህ ጣቢያ በiframe ውስጥ መከፈትን ይከለክላል። በአዲስ ታብ ሞክር፦</div>
+      <a href="${site.url}" target="_blank" rel="noopener" class="action-btn">🌐 በአዲስ ታብ ክፈት</a>
+      <button class="action-btn secondary" onclick="document.getElementById('serverBtn').click()">🔄 ሌላ ሰርቨር ምረጥ</button>
     </div>
   `;
 }
@@ -450,18 +540,18 @@ function renderServerMenu() {
   serverMenu.innerHTML = '';
   SITES.forEach(site => {
     const btn = document.createElement('button');
-    btn.textContent = site.name;
-    btn.className = site.id === currentServer.id ? 'active' : '';
+    btn.className = site.id === currentServer?.id ? 'active' : '';
+    btn.innerHTML = `<span>${site.name}</span>${site.id === currentServer?.id ? '<span class="check">✓</span>' : ''}`;
     btn.addEventListener('click', () => {
-      currentServer = site;
       serverMenu.classList.remove('open');
+      serverBtn.classList.remove('open');
       loadStream(site);
     });
     serverMenu.appendChild(btn);
   });
 }
 
-/* ---------- የታችኛው አሞሌ ቅያሬ ---------- */
+/* ---------- የታችኛው አሞሌ ---------- */
 tabResults.addEventListener('click', () => {
   tabResults.classList.add('active');
   tabLive.classList.remove('active');
@@ -480,19 +570,33 @@ tabLive.addEventListener('click', () => {
 /* ---------- የማጫወቻ መዝጊያ ---------- */
 closePlayer.addEventListener('click', () => {
   playerModal.classList.remove('open');
-  if (currentHls) { currentHls.destroy(); currentHls = null; }
-  video.parentElement.innerHTML = '';
-  video.parentElement.appendChild(video);
+  videoContainer.innerHTML = '';
+  clearTimeout(loadTimer);
+});
+
+/* ---------- የሙሉ ስክሪን ---------- */
+fullscreenBtn.addEventListener('click', () => {
+  const el = playerModal;
+  if (!document.fullscreenElement) {
+    (el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen).call(el);
+  } else {
+    (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+  }
 });
 
 /* ---------- የሰርቨር መቀየሪያ ---------- */
 serverBtn.addEventListener('click', () => {
   renderServerMenu();
   serverMenu.classList.toggle('open');
+  serverBtn.classList.toggle('open');
 });
 
 /* ---------- ማስጀመሪያ ---------- */
 loadResults();
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
 </script>
 </body>
 </html>
